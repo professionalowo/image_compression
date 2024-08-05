@@ -8,8 +8,6 @@ pub struct DeflateStream {
     check_value: u32,
 }
 
-const SYMBOL_BUFFER_LENGTH: u16 = 16383;
-
 impl Compressable for DeflateStream {
     type Error = DeflateError;
     fn try_compress(&self) -> Result<Self, Self::Error>
