@@ -5,8 +5,8 @@ use std::{
 
 use png::PngImage;
 
-mod deflate;
 mod crc;
+mod deflate;
 pub mod png;
 
 pub trait Compressable {
@@ -16,6 +16,7 @@ pub trait Compressable {
         Self: Sized;
 }
 
+/*
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
@@ -57,3 +58,4 @@ fn main() -> Result<(), Error> {
 
     Ok(())
 }
+ */
