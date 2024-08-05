@@ -107,8 +107,10 @@ impl Compressable for PngImage {
         //strip auxilliary chunks
         let only_data = data
             .iter()
-            .filter(|chunk| !chunk.is_ancillary())
-            .map(|chunk| -> Chunk { chunk.clone() })
+            .filter_map(|chunk| match chunk.is_ancillary() {
+                false => Some(chunk.clone()),
+                _ => None,
+            })
             .collect();
 
         let mut out = self.clone();
