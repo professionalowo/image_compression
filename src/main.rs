@@ -6,6 +6,7 @@ use std::{
 use png::PngImage;
 
 mod deflate;
+mod crc;
 pub mod png;
 
 pub trait Compressable {

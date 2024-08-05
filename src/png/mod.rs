@@ -1,4 +1,4 @@
-use crate::{deflate::DeflateStream, Compressable};
+use crate::{crc, deflate::DeflateStream, Compressable};
 
 type PngResult<T> = std::result::Result<T, PngError>;
 #[derive(Debug, Clone)]
@@ -135,19 +135,37 @@ impl Compressable for PngImage {
             Ok(comp) => comp,
             Err(_) => return Err(PngError::new("could not compress data stream")),
         };
-
+        const IDAT_SIZE: usize = 65_524;
+        let mut out_chunks: Vec<Chunk> = Vec::new();
+        let ihdrheader: Chunk = out.data[0].clone();
+        out_chunks.push(ihdrheader);
         let deflate_bytes: Vec<u8> = compressed_deflate.into();
 
-        let mut already_consumed = 0;
-        for chunk in only_idat {
-            let chunk_len = chunk.chunk_data.len();
-            if already_consumed > deflate_bytes.len() {
-                break;
-            }
-            chunk.set_data(deflate_bytes[already_consumed..already_consumed + chunk_len].into());
-            already_consumed += chunk_len;
-        }
-        out.data = only_critical.into();
+        let crc32 = crc::Crc32::new();
+
+        let chunked: Vec<Chunk> = deflate_bytes
+            .chunks(IDAT_SIZE)
+            .map(|chunk| -> Chunk {
+                let length: u32 = chunk.len().try_into().unwrap();
+                let chunk_type = IDAT_TYPE;
+                let chunk_data: Box<[u8]> = chunk.into();
+
+                let mut bytes: Vec<u8> = Vec::new();
+                bytes.extend(chunk_type);
+                bytes.extend(chunk_data.iter());
+
+                let crc = crc32.crc(&bytes);
+                Chunk {
+                    length,
+                    chunk_type,
+                    chunk_data,
+                    crc,
+                }
+            })
+            .collect();
+        out_chunks.extend(chunked);
+        out_chunks.push(out.data[out.data.len() - 1].clone());
+        out.data = out_chunks.into();
 
         Ok(out)
     }
@@ -273,7 +291,7 @@ impl Chunk {
 
         let data_length = length - 8;
 
-        let chunk = Chunk {
+        let chunk = Self {
             length: data_length,
             chunk_type,
             chunk_data,

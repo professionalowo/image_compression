@@ -1,4 +1,7 @@
 use crate::Compressable;
+use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use std::io::{Read, Write};
+pub struct DeflateError {}
 
 #[derive(Debug, Clone)]
 pub struct DeflateStream {
@@ -14,11 +17,25 @@ impl Compressable for DeflateStream {
     where
         Self: Sized,
     {
-        Ok(self.clone())
+        let self_vec: Vec<u8> = self.clone().into();
+        let mut decompressed_data = Vec::new();
+        {
+            let mut decoder = ZlibDecoder::new(&*self_vec);
+            decoder
+                .read_to_end(&mut decompressed_data)
+                .expect("Failed to decompress data");
+        }
+
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
+        encoder
+            .write_all(&decompressed_data)
+            .expect("Failed to write data");
+        let compressed = encoder.finish().expect("Failed to finish compression");
+
+        println!("{} {}", decompressed_data.len(), compressed.len());
+        DeflateStream::try_create(compressed)
     }
 }
-
-pub struct DeflateError {}
 
 impl Into<Vec<u8>> for DeflateStream {
     fn into(self) -> Vec<u8> {
