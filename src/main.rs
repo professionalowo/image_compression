@@ -5,10 +5,14 @@ use std::{
 
 use png::PngImage;
 
+mod deflate;
 pub mod png;
 
 pub trait Compressable {
-    fn compress(&self) -> Self;
+    type Error;
+    fn try_compress(&self) -> Result<Self, Self::Error>
+    where
+        Self: Sized;
 }
 
 fn main() -> Result<(), Error> {
@@ -30,7 +34,7 @@ fn main() -> Result<(), Error> {
 
     let mut outfile = fs::File::create(output)?;
 
-    let compressed = png.compress();
+    let compressed = png.try_compress().unwrap();
 
     let compressed_size = compressed.size();
 

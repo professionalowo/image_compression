@@ -1,4 +1,4 @@
-use crate::Compressable;
+use crate::{deflate::DeflateStream, Compressable};
 
 type PngResult<T> = std::result::Result<T, PngError>;
 #[derive(Debug, Clone)]
@@ -35,6 +35,11 @@ impl PngImage {
                 file_signature[i] = byte.clone();
             }
         }
+        assert_eq!(
+            file_signature,
+            [137, 80, 78, 71, 13, 10, 26, 10],
+            "file signature is wrong"
+        );
         let chunks = chunk(iter)?;
 
         let header: IhdrHeader = chunks[0].clone().try_into()?;
@@ -101,32 +106,50 @@ where
 }
 
 impl Compressable for PngImage {
-    fn compress(&self) -> Self {
+    type Error = PngError;
+    fn try_compress(&self) -> PngResult<Self> {
+        let mut out = self.clone();
         let data = self.data.clone();
 
         //strip auxilliary chunks
-        let only_data = data
+        let mut only_critical: Vec<Chunk> = data
             .iter()
-            .filter_map(|chunk| match chunk.is_ancillary() {
-                false => Some(chunk.clone()),
-                _ => None,
-            })
+            .filter_map(|chunk| (!chunk.is_ancillary()).then_some(chunk.clone()))
             .collect();
 
-        let mut out = self.clone();
+        let only_critical_len = only_critical.len();
 
-        out.data = only_data;
+        let only_idat: &mut [Chunk] = only_critical[1..only_critical_len - 1].as_mut();
 
-        out
-    }
-}
+        let idat_stream_data = only_idat
+            .iter()
+            .flat_map(|chunk| -> Vec<u8> { chunk.chunk_data.to_vec() })
+            .collect::<Vec<u8>>();
 
-impl<I> From<I> for PngImage
-where
-    I: IntoIterator<Item = u8>,
-{
-    fn from(data: I) -> Self {
-        Self::try_create(data).unwrap()
+        let deflate = match DeflateStream::try_create(idat_stream_data.clone()) {
+            Ok(stream) => stream,
+            Err(_) => return Err(PngError::new("could not create inflate stream")),
+        };
+
+        let compressed_deflate = match deflate.try_compress() {
+            Ok(comp) => comp,
+            Err(_) => return Err(PngError::new("could not compress data stream")),
+        };
+
+        let deflate_bytes: Vec<u8> = compressed_deflate.into();
+
+        let mut already_consumed = 0;
+        for chunk in only_idat {
+            let chunk_len = chunk.chunk_data.len();
+            if already_consumed > deflate_bytes.len() {
+                break;
+            }
+            chunk.set_data(deflate_bytes[already_consumed..already_consumed + chunk_len].into());
+            already_consumed += chunk_len;
+        }
+        out.data = only_critical.into();
+
+        Ok(out)
     }
 }
 
@@ -137,7 +160,7 @@ impl Into<Vec<u8>> for PngImage {
         vec.extend(
             self.data
                 .iter()
-                .flat_map(move |c| -> Vec<u8> { Chunk::into(c.clone()) })
+                .flat_map(|c| -> Vec<u8> { Chunk::into(c.clone()) })
                 .collect::<Vec<u8>>(),
         );
 
@@ -221,6 +244,10 @@ impl Into<Vec<u8>> for Chunk {
 }
 
 impl Chunk {
+    pub fn set_data(&mut self, data: Box<[u8]>) {
+        self.chunk_data = data;
+    }
+
     fn try_create<I>(length: u32, data: I) -> PngResult<Self>
     where
         I: IntoIterator<Item = u8>,
