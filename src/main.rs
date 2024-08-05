@@ -37,6 +37,17 @@ fn main() -> Result<(), Error> {
     let bytes_out: Vec<u8> = compressed.into();
     outfile.write_all(&bytes_out)?;
 
+    let chunk = &png.get_data()[2];
+
+    println!(
+        "{:X?}\n{},{},{},{}",
+        chunk,
+        chunk.is_ancillary(),
+        chunk.is_private(),
+        chunk.is_reserved(),
+        chunk.is_save_to_copy()
+    );
+
     println!("Compressed: {} -> {}", png.size(), compressed_size);
 
     Ok(())
