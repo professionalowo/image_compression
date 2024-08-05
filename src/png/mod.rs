@@ -366,3 +366,4 @@ pub enum InterlaceMethod {
     NONE = 0,
     ADAM7 = 1,
 }
+pub const IDAT_TYPE: [u8; 4] = [0x49, 0x44, 0x41, 0x54];
