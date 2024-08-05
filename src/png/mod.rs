@@ -107,9 +107,8 @@ impl Compressable for PngImage {
         //strip auxilliary chunks
         let only_data = data
             .iter()
-            .enumerate()
-            .filter(|(index, chunk)| chunk.length > 256 || *index == 0 || *index == data.len() - 1)
-            .map(|(_, chunk)| chunk.clone())
+            .filter(|chunk| !chunk.is_ancillary())
+            .map(|chunk| -> Chunk { chunk.clone() })
             .collect();
 
         let mut out = self.clone();
@@ -252,6 +251,27 @@ impl Chunk {
             crc,
         };
         Ok(chunk)
+    }
+
+    pub fn is_ancillary(&self) -> bool {
+        Chunk::is_bit_set(&self.chunk_type[0], 5)
+    }
+
+    pub fn is_private(&self) -> bool {
+        Chunk::is_bit_set(&self.chunk_type[1], 5)
+    }
+
+    pub fn is_reserved(&self) -> bool {
+        Chunk::is_bit_set(&self.chunk_type[2], 5)
+    }
+
+    pub fn is_save_to_copy(&self) -> bool {
+        Chunk::is_bit_set(&self.chunk_type[3], 5)
+    }
+
+    fn is_bit_set(data: &u8, index: usize) -> bool {
+        let mask = 1 << index;
+        (mask & data) > 0
     }
 }
 
