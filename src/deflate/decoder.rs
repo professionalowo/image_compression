@@ -20,7 +20,7 @@ impl Decoder {
         Ok(Box::new([0]))
     }
 }
-
+#[derive(Debug)]
 struct ByteWindow<const COUNT: usize> {
     written: u64,
     index: usize,
