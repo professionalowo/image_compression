@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{collections::VecDeque, io::Read};
 
 use super::{DecoderResult, DeflateError};
 struct CanonicalCode {
@@ -54,16 +54,14 @@ impl CanonicalCode {
         })
     }
 
-    pub fn decode_next_symbol<I>(&self, input: I) -> DecoderResult<u64>
+    pub fn decode_next_symbol<I>(&self, input: &mut BitIter) -> DecoderResult<u64>
     where
-        I: IntoIterator<Item = u64>,
+        I: IntoIterator<Item = u8>,
     {
-        todo!("read bit by bit");
-        let mut iter = input.into_iter();
         let mut code_bits = 1;
         loop {
-            code_bits = code_bits << 1 | iter.next().unwrap();
-            match self.symbol_code_bits.binary_search(&code_bits) {
+            code_bits = code_bits << 1 | input.read_uint(1)?;
+            match self.symbol_code_bits.binary_search(&(code_bits as u64)) {
                 Ok(s) => return Ok(self.symbol_values[s]),
                 Err(_) => return Err(DeflateError("unknown huffman code".into())),
             }
@@ -71,4 +69,74 @@ impl CanonicalCode {
     }
 }
 
+#[derive(Debug)]
+struct BitIter {
+    current_byte: Option<u8>,
+    remaining: u8,
+    inner: VecDeque<u8>,
+}
+impl BitIter {
+    pub fn new<I>(inner: I) -> Self
+    where
+        I: IntoIterator<Item = u8>,
+    {
+        let inner_vec: VecDeque<u8> = inner.into_iter().collect();
+
+        Self {
+            current_byte: Some(0),
+            remaining: 0,
+            inner: inner_vec,
+        }
+    }
+
+    fn get_bit_position(&self) -> u8 {
+        (8 - self.remaining) % 8
+    }
+
+    fn read_next_maybe(&mut self) -> Option<u8> {
+        if self.current_byte == None {
+            return None;
+        };
+        if self.remaining == 0 {
+            self.current_byte = self.inner.pop_front().map(|b| b.reverse_bits());
+            match self.current_byte {
+                None => return None,
+                Some(_) => self.remaining = 8,
+            }
+        };
+        self.remaining -= 1;
+
+        self.current_byte
+            .map(|byte| (byte >> (7 - self.remaining)) & 1)
+    }
+
+    pub fn read_uint(&mut self, num_bits: u8) -> DecoderResult<u8> {
+        if num_bits > 31 {
+            return Err(DeflateError("Number of bits out of range".into()));
+        };
+        let mut result = 0;
+        for i in 0..num_bits {
+            let bit = match self.read_next_maybe() {
+                Some(b) => b,
+                None => return Err(DeflateError("Unexpected end of stream".into())),
+            };
+            result |= bit << i;
+        }
+        Ok(result.reverse_bits())
+    }
+}
+
 const MAX_CODE_LENGTH: u8 = 15;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn bit_iter_test() {
+        let vec: Vec<u8> = vec![10];
+
+        let mut iter: BitIter = BitIter::new(vec);
+        let byte = iter.read_uint(8);
+        assert_eq!(byte.unwrap(), 10)
+    }
+}
