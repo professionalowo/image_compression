@@ -170,6 +170,7 @@ impl Compressable for PngImage {
             .collect();
         out_chunks.extend(chunked);
         out_chunks.push(out.data[out.data.len() - 1].clone());
+        out_chunks.shrink_to_fit();
         out.data = out_chunks.into();
 
         Ok(out)
