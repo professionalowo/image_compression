@@ -4,6 +4,7 @@ use std::{io::Error, ops::Range};
 #[derive(Debug)]
 pub struct Decoder {
     data: Box<[u8]>,
+    byte_window: ByteWindow<32768>,
 }
 
 impl Decoder {
@@ -11,12 +12,12 @@ impl Decoder {
     where
         I: IntoIterator<Item = u8>,
     {
+        let byte_window = ByteWindow::<32768>::new();
         let data: Box<[u8]> = data_source.into_iter().collect();
-        Self { data }
+        Self { data, byte_window }
     }
 
-    pub fn decode(&self) -> Result<Box<[u8]>, Error> {
-        let window = ByteWindow::<{ 32 * 1024 }>::new();
+    pub fn decode(&mut self) -> Result<Box<[u8]>, Error> {
         Ok(Box::new([0]))
     }
 }
