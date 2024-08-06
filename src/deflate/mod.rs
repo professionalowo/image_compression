@@ -29,6 +29,7 @@ impl Compressable for DeflateStream {
         Self: Sized,
     {
         let self_vec: Vec<u8> = self.clone().into();
+
         let mut decompressed_data = Vec::new();
         {
             let mut decoder = ZlibDecoder::new(&*self_vec);
