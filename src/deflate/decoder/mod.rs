@@ -1,10 +1,11 @@
-//see: https://github.com/nayuki/Simple-DEFLATE-decompressor/blob/master/java/src/ByteHistory.java
+//see: https://github.com/nayuki/Simple-DEFLATE-decompressor/blob/master/java/src
 use std::io::Error;
 
 use super::DeflateError;
 use byte_window::ByteWindow;
 
 mod byte_window;
+mod canonical_code;
 
 type DecoderResult<T> = Result<T, DeflateError>;
 
@@ -24,7 +25,7 @@ impl Decoder {
         Self { data, byte_window }
     }
 
-    pub fn decode(&mut self) -> Result<Box<[u8]>, Error> {
+    pub fn decode(&mut self) -> DecoderResult<Box<[u8]>> {
         Ok(Box::new([0]))
     }
 }
