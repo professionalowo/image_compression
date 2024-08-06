@@ -6,7 +6,13 @@ mod decoder;
 mod deflate;
 mod encoder;
 
-pub struct DeflateError {}
+#[derive(Debug)]
+pub struct DeflateError(String);
+impl Default for DeflateError {
+    fn default() -> Self {
+        Self("Error while decoding".into())
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct DeflateStream {
@@ -66,7 +72,7 @@ impl DeflateStream {
 
         let check_value_bytes: [u8; 4] = match vec[vec.len() - 4..].try_into() {
             Ok(b) => b,
-            Err(_) => return Err(DeflateError {}),
+            Err(_) => return Err(DeflateError::default()),
         };
         let data_blocks: Box<[u8]> = vec[2..vec.len() - 4].into();
         let check_value = u32::from_be_bytes(check_value_bytes);
