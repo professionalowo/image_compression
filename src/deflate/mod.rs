@@ -1,6 +1,11 @@
 use crate::Compressable;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use std::io::{Read, Write};
+
+mod decoder;
+mod deflate;
+mod encoder;
+
 pub struct DeflateError {}
 
 #[derive(Debug, Clone)]
