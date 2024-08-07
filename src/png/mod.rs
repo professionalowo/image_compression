@@ -1,10 +1,12 @@
 use chunk::Chunk;
+use deflate::DeflateStream;
 use ihdrheader::IhdrHeader;
 
-use crate::{crc, deflate::DeflateStream, Compressable};
+use crate::Compressable;
 mod chunk;
+mod crc;
+mod deflate;
 mod ihdrheader;
-
 type PngResult<T> = std::result::Result<T, PngError>;
 #[derive(Debug, Clone)]
 pub struct PngError {
