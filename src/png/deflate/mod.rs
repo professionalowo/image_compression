@@ -3,11 +3,9 @@ use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use std::io::{Read, Write};
 
 #[derive(Debug)]
-pub struct DeflateError(String);
-impl Default for DeflateError {
-    fn default() -> Self {
-        Self("Error while decoding".into())
-    }
+pub enum DeflateError {
+    IO(std::io::Error),
+    InvalidCheckBytes(std::array::TryFromSliceError),
 }
 
 #[derive(Debug, Clone)]
@@ -31,14 +29,14 @@ impl Compressable for DeflateStream {
             let mut decoder = ZlibDecoder::new(&*self_vec);
             decoder
                 .read_to_end(&mut decompressed_data)
-                .expect("Failed to decompress data");
+                .map_err(DeflateError::IO)?;
         }
 
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
         encoder
             .write_all(&decompressed_data)
-            .expect("Failed to write data");
-        let compressed = encoder.finish().expect("Failed to finish compression");
+            .map_err(DeflateError::IO)?;
+        let compressed = encoder.finish().map_err(DeflateError::IO)?;
 
         println!("{} {}", decompressed_data.len(), compressed.len());
         DeflateStream::try_create(compressed)
@@ -67,10 +65,9 @@ impl DeflateStream {
         let compression_method = vec[0];
         let flags = vec[1];
 
-        let check_value_bytes: [u8; 4] = match vec[vec.len() - 4..].try_into() {
-            Ok(b) => b,
-            Err(_) => return Err(DeflateError::default()),
-        };
+        let check_value_bytes: [u8; 4] = vec[vec.len() - 4..]
+            .try_into()
+            .map_err(DeflateError::InvalidCheckBytes)?;
         let data_blocks: Box<[u8]> = vec[2..vec.len() - 4].into();
         let check_value = u32::from_be_bytes(check_value_bytes);
 
